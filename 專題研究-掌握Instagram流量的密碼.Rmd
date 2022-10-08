@@ -1,0 +1,463 @@
+---
+title: "發文最佳時機_書面報告"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+### **研究動機**
+
+在手機普及之前，擁有明星夢的人往往只能藉由電視節目才可能得到
+大眾關注。現今智慧型手機普及率高，人人都有自己的手機與社群帳號，
+動動手指就可以擁有展現自己的機會，無需尋求電視台或是節目曝光。至
+於如何在眾多素人中脫穎而出，就是本研究的動機。我們發現正確的標籤
+可以讓文章擁有更多曝光度，從而達到表現自己的機會。
+
+### **研究目的**
+對於剛起步的素人來說，首要目標就是推廣自己、進入大眾視野，能
+達到此目的的重要關鍵就是「圖文」與「標籤」。運用正確且效率高的標
+籤可以大大增加曝光度；發文的時間則關係到貼文的得讚數與留言數，妥
+善利用上列因素便可輕易達到預期的曝光度及觸擊率。此研究目的正是提
+供素人流量的密碼，達到與藝人明星不相上下的曝光度，也給自己的夢想
+一個更好的機會。
+
+
+### **資料來源**
+
+[instagram Reach](https://www.kaggle.com/rxsraghavagrawal/instagram-reach)
+
+### **焦點問題**
+
+- 自媒體與個人品牌是現今的創新產業，正因如此社群的流量與活動顯得更加重要，如何發文與如何創造流量是創造商機的關鍵。
+
+- 時間與得讚數有什麼相關性？
+
+- 標籤數量越多，得讚數就越多嗎？
+
+### **分析變量**
+
+- 得讚數
+
+- 追蹤人數 
+
+- 標籤(Hashtags)數量 
+
+- 文章發布後時長
+
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+library(tidyverse)
+library(tidytext)
+library(tm)
+library(dplyr)
+library(stringr)
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(RColorBrewer)
+library(knitr)
+library(kableExtra)
+
+```
+==============================================================================================================================================================
+
+
+### **資料整理與觀察**
+
+* 分割標籤
+* 計算每篇文章的標籤個數
+
+```{r message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+ig_data=read.csv("C:/Users/user/Desktop/課業資料/統軟/ig.re.csv")
+
+```
+***
+
+##### 原始資料（僅以部份表示）
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+notags <- ig_data[c(1:5),c(2,6)]
+kbl(notags,align = "l") %>%
+  kable_paper() %>%
+  kable_classic(full_width = T) %>%
+  kable_styling(font_size = 16)
+```
+
+###### **=> 上圖中資料清除雜訊，如「？」，再依據「#」分割成下圖**
+
+*****
+##### 資料分割
+```{r echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+tags=ig_data$Hashtags
+
+tags=as.data.frame(tags)
+
+for(i in 1:nrow(tags)){
+  tags[i,]=as.character(tags[i,])
+}
+
+tags=cbind(matrix(c(1:100),nrow=100,ncol=1),tags)
+
+colnames(tags)=c("No","word")
+  
+tags=tags%>%
+  unnest_tokens(words,word)
+
+count=c()
+for(j in 1:100){
+  count=rbind(count,nrow(tags[which(tags$No==j),]))
+  
+}
+```
+
+*****
+
+##### 資料分割結果(僅以部份表示)
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+yestags <- tags[c(1:15),]
+kbl(yestags,align = "l") %>%
+  kable_paper() %>%
+  kable_classic(full_width = T) %>%
+  kable_styling(font_size = 16)
+```
+
+###### **=> 「No」相同代表來自同一篇貼文**
+
+***
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+ig=c()
+ig=cbind(ig,ig_data$S.No)
+ig=cbind(ig,ig_data$Followers)
+ig=cbind(ig,gsub("hours","",ig_data$Time.since.posted))
+count=as.data.frame(count)
+ig=cbind(ig,count$V1)
+ig=cbind(ig,ig_data$Likes)
+colnames(ig)=c("No","Followers","Time","Hashtags","Likes")
+```
+
+
+##### 加上每篇文章的標籤個數的資料（僅以部份表示）
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+igc <- ig[c(1:15),]
+kbl(igc,align = "l") %>%
+  kable_paper() %>%
+  kable_classic(full_width = T) %>%
+  kable_styling(font_size = 16)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+ig=as.data.frame(ig)
+ig$Followers=as.numeric(ig$Followers)
+ig$Time=as.numeric(ig$Time)
+ig$Hashtags=as.numeric(ig$Hashtags)
+ig$Likes=as.numeric(ig$Likes)
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+ig2hours=ig[which(ig$Time==2),]
+ig3hours=ig[which(ig$Time==3),]
+ig4hours=ig[which(ig$Time==4),]
+ig5hours_up=ig[which(ig$Time>=5),]
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+ig2hours$Followers=as.numeric(ig2hours$Followers)
+ig2hours$Time=as.numeric(ig2hours$Time)
+ig2hours$Hashtags=as.numeric(ig2hours$Hashtags)
+ig2hours$Likes=as.numeric(ig2hours$Likes)
+
+ig3hours$Followers=as.numeric(ig3hours$Followers)
+ig3hours$Time=as.numeric(ig3hours$Time)
+ig3hours$Hashtags=as.numeric(ig3hours$Hashtags)
+ig3hours$Likes=as.numeric(ig3hours$Likes)
+
+ig4hours$Followers=as.numeric(ig4hours$Followers)
+ig4hours$Time=as.numeric(ig4hours$Time)
+ig4hours$Hashtags=as.numeric(ig4hours$Hashtags)
+ig4hours$Likes=as.numeric(ig4hours$Likes)
+
+ig5hours_up$Followers=as.numeric(ig5hours_up$Followers)
+ig5hours_up$Time=as.numeric(ig5hours_up$Time)
+ig5hours_up$Hashtags=as.numeric(ig5hours_up$Hashtags)
+ig5hours_up$Likes=as.numeric(ig5hours_up$Likes)
+
+```
+
+
+===================================================================================================================
+
+
+### **資料分析**
+
+#### 直方圖
+##### - Followers
+```{r echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+hist(ig$Followers,main="Followers",ylab = "Numbers of data",xlab="Followers",breaks = 10)
+```
+
+***
+
+##### - Likes
+```{r echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+hist(ig$Likes,main="Likes",ylab = "Numbers of data",xlab="Likes",breaks = 10)
+```
+
+***
+
+##### - Hashtags
+```{r echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+hist(ig$Hashtags,main="Hashtags",ylab = "Numbers of data",xlab="Hashtags",breaks = 10)
+```
+
+***
+
+##### - 貼文發佈時長切割畫圖
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+par(mfrow=c(2,2))
+hist(ig2hours$Likes,main="Likes(2hours)",ylab = "Numbers of data",xlab="Likes",breaks = 5,ylim=c(0,45),xlim=c(0,300))
+hist(ig3hours$Likes,main="Likes(3hours)",ylab = "Numbers of data",xlab="Likes",breaks = 5,ylim=c(0,45),xlim=c(0,300))
+hist(ig4hours$Likes,main="Likes(4hours)",ylab = "Numbers of data",xlab="Likes",breaks = 3,ylim=c(0,45),xlim=c(0,300))
+hist(ig5hours_up$Likes,main="Likes(5hours up)",ylab = "Numbers of data",xlab="Likes",breaks = 5,ylim=c(0,45),xlim=c(0,300))
+```
+
+###### **=> 按讚數限制在0~150**
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+hist(ig2hours$Likes,main="Likes(2hours)",ylab = "Numbers of data",xlab="Likes",breaks = 10,ylim=c(0,30),xlim=c(0,150))
+hist(ig3hours$Likes,main="Likes(3hours)",ylab = "Numbers of data",xlab="Likes",breaks = 10,ylim=c(0,20),xlim=c(0,150))
+hist(ig4hours$Likes,main="Likes(4hours)",ylab = "Numbers of data",xlab="Likes",breaks = 7,ylim=c(0,20),xlim=c(0,150))
+hist(ig5hours_up$Likes,main="Likes(5hours up)",ylab = "Numbers of data",xlab="Likes",breaks = 20,ylim=c(0,20),xlim=c(0,150))
+```
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#### 散佈圖
+
+
+##### - 追蹤人數與得讚數的關係
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+plot(x=ig$Followers,y=ig$Likes,main="Followers v.s. Likes",xlab="Followers",ylab="Likes")
+abline(h=46, v=962)
+```
+
+
+###### **=> 由於資料集中在左下角，因此我們主要關注此區** 
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+##### - 追蹤人數 v.s. 得讚數-聚焦左下角
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+plot(ig$Likes~ig$Followers,main="",ylab = "Likes",xlab="Followers",ylim=c(0,46),xlim=c(0,962))
+
+```
+
+###### **=> 可看出粉絲人數在1000人以內，得讚數與追蹤者數量成正相關**
+
+****
+
+#####  - 標籤數量 v.s. 得讚數
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+plot(x=ig$Hashtags,y=ig$Likes,main="Hashtags v.s. Likes",xlab="Hashtags",ylab="Likes")
+```
+
+###### **=> 由於得讚數在 0 到 50之間的資料無法判斷變化，且我們認為標籤是 Instagram 一項非常強大的功能，也是用戶的共同語言，因此我們做了標籤的文字雲。**
+
+***
+
+
+### **文字雲**
+- 刪除全部的停用詞(stop_words)
+- 分割並數個數
+- 繪出文字雲
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+data(stop_words)
+colnames(tags)=c("no","word")
+tags=tags%>%
+  anti_join(stop_words)
+
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+token=tags%>%
+  group_by()%>%
+  count(word,sort=TRUE)%>%
+  ungroup()
+
+token
+```
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+rownames(token)=token$word
+set.seed(11)
+wordcloud(words = token$word, freq = token$n, min.freq = 1,
+          max.words=100, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(10, "Dark2"))
+
+```
+
+###### **=> ”ai”、”blockchain”、”startup”為較多人使用的標籤。我們也實際看了得讚數較高的文章，發現他們都有使用這些較熱門的標籤，因此我們認為標籤的數量不是重點，是否標籤到關鍵字才是得讚數高的密碼。**
+
+****
+
+##### - 發佈後幾小時內追蹤人數 v.s. 得讚數(有限制範圍)
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+par(mfrow=c(2,2))
+plot(ig2hours$Likes~ig2hours$Followers,main="Followers v.s. Likes(2hours)",ylab = "Likes",xlab="Followers",ylim=c(0,150),xlim=c(0,1300))
+plot(ig3hours$Likes~ig3hours$Followers,main="Followers v.s. Likes(3hours)",ylab = "Likes",xlab="Followers",ylim=c(0,150),xlim=c(0,1300))
+plot(ig4hours$Likes~ig4hours$Followers,main="Followers v.s. Likes(4hours)",ylab = "NLikes",xlab="Followers",ylim=c(0,150),xlim=c(0,1300))
+plot(ig5hours_up$Likes~ig5hours_up$Followers,main="Followers v.s. Likes(5hours up)",ylab = "Likes",xlab="Followers",ylim=c(0,150),xlim=c(0,1300))
+```
+
+###### **=> 由於資料筆數少，我們無法得出發文後時長及按讚數的相關性。於是我們分別將各項時長（2、3、4 小時以及 5 小時及以上）得讚數最高的資料抓出來查看，發現每筆所標記的標籤至少包含一項熱門標記(”ai”、”blockchain”、”startup”)。**
+
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+plot(x=ig$Hashtags,y=ig$Likes,xlim=c(0,34),ylim=c(0,100),main="Likes to Hashtags",xlab="Hashtags",ylab="Likes")
+abline(h=29, v=20.5)
+```
+
+***
+
+
+===================================================================================================================
+
+```{r eval=FALSE, warning=FALSE, include=FALSE}
+# Data Standardlize
+s.dum=scale(ig,center=T,scale=T)
+s.dum=as.data.frame(s.dum)
+```
+
+```{r eval=FALSE, message=FALSE, include=FALSE, results='hide'}
+#比較標準化前後的差別(Likes to Followers)
+par(mfrow=c(1,2))
+plot(x=s.dum$Followers, y=s.dum$Likes,main="Followers to Likes (standarlized)",xlab="Followers",ylab="Likes")
+plot(x=ig$Followers,y=ig$Likes,main="Followers to Likes",xlab="Followers",ylab="Likes")
+
+#比較標準化前後的差別(Likes to Time)
+par(mfrow=c(1,2))
+plot(x=s.dum$Time, y=s.dum$Likes,main="Time to Likes (standarlized)",xlab="Time",ylab="Likes")
+plot(x=ig$Time,y=ig$Likes,main="Time to Likes",xlab="Time",ylab="Likes")
+
+#比較標準化前後的差別(Likes to Hashtags)
+par(mfrow=c(1,2))
+plot(x=s.dum$Hashtags, y=s.dum$Likes,main="Hashtags to Likes (standarlized)",xlab="Hashtags",ylab="Likes")
+plot(x=ig$Hashtags,y=ig$Likes,main="Hashtags to Likes",xlab="Hashtags",ylab="Likes")
+```
+
+### 迴歸分析
+* 基本設定
+  
+  $Y$ = 得讚數
+  
+  $X_1$ = 追蹤人數 
+  
+  $X_2$ = 標籤(Hashtags)數量 
+  
+  $X_3$ = 文章發布後時長
+  
+* 迴歸模型
+
+  **i.** 原式
+
+  $Y = X_1+X_2+X_3$
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+fm=lm(ig$Likes~ig$Followers+ig$Time+ig$Hashtags,ig)
+par(mfrow=c(2,2))
+plot(fm)
+```
+
+****
+
+****
+ 
+
+  **ii.** 調整1
+
+  $\sqrt{Y} = X_1+X_2+X_3$
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+fm11=lm(sqrt(ig$Likes)~ig$Followers+ig$Time+ig$Hashtags,ig)
+plot(fm11)
+```
+
+****
+
+****
+ 
+  **iii.** 調整2
+
+  $\sqrt{Y} = (X1+X2+X3)^2$
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+fm12=lm(sqrt(ig$Likes)~(ig$Followers+ig$Time+ig$Hashtags)^2,ig)
+plot(fm12)
+```
+
+****
+
+****
+ 
+  **iv.** 調整3
+
+  $Y = log(X_1+X_2+X_3)$
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+par(mfrow=c(2,2))
+fm13=lm(ig$Likes~log(ig$Followers+ig$Time+ig$Hashtags),ig)
+plot(fm13)
+
+```
+
+###### **=> 我們也做了許多嘗試來處理這筆資料，但因為目前迴歸方面的知識還不夠熟悉，模型改善後的表現不如預期。討論過後認為主因是資料筆數過少，導致資料不甚符合模型。**
+
+====================================================================================================================
+
+### **結論與討論**
+
+回應問題
+
+* 現今自媒體種類繁多，自我行銷的方式隨著社群不同而有所差異。例如 YouTube 上吸引人氣的主要為 10 至 20 分鐘的影片；Facebook 上的15秒短影片近期也成為眾人目光聚焦之處；而對於 Instagram，除了吸睛的圖文外，由於其特殊的搜尋以及追蹤機制，是否標記到熱門的Hashtags(標籤)也是創造流量及商機的「密碼」之一。
+
+* 由於數據筆數不足，因此在迴歸方面我們無法得出時間與得讚數是否具有顯著相關性的結論，但在不同的貼文發布時長之下，我們發現得讚數高的依然是標記到熱門關鍵字的貼文。
+
+* 我們發現標籤數量多並不是得讚數的重點，有時標記太多反而讓文章失去重點，適得其反。
+
+
+
+### **參考文獻**
+
+1.[Instagram Reach](https://www.kaggle.com/rxsraghavagrawal/instagram-reach)
+
+2.[不花錢也能讓 IG 粉絲變多？IG「最火熱門標籤 Top10」加上#hashtag 讓你人氣爆增！](https://www.bella.tw/articles/design&gadget/23551)
+
+3.[社群什麼時候發文最多人看？FB、YouTube、IG 最佳發文時間！](https://www.marketersgo.com/marketing-strategies-tactics/202001/ig-fb-yt-socialmedia/#IG)
+
+4.[2019 IG 必學 4 招全攻略，貼文觸及翻倍，從零開始打造品牌成為人氣王！](https://www.cyberbiz.io/blog/2019-ig-%E5%BF%85%E5%AD%B8-4-%E6%8B%9B%E5%85%A8%E6%94%BB%E7%95%A5%EF%BC%8C%E8%B2%BC%E6%96%87%E8%A7%B8%E5%8F%8A%E7%BF%BB%E5%80%8D%EF%BC%8C%E6%89%93%E9%80%A0%E4%BA%BA%E6%B0%A3%E7%8E%8B%E5%93%81%E7%89%8C/)
+
